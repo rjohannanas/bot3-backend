@@ -1,0 +1,18 @@
+fastapi==0.115.11
+fastembed==0.8.0
+uvicorn==0.34.0
+gradio==6.13.0
+langchain-google-vertexai==3.2.2
+langchain-qdrant==1.1.0
+langchain-text-splitters==1.1.2
+langfuse==4.5.1
+langgraph==1.1.9
+pymupdf4llm==1.27.2.3
+python-dotenv==1.2.2
+tiktoken==0.12.0
+
+# Database & Auth
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+firebase-admin>=6.6.0
+cloud-sql-python-connector[pg8000]>=1.20.0
