@@ -15,7 +15,7 @@ GCP_LLM_LOCATION = os.environ.get("GCP_LLM_LOCATION", "global")
 CHILD_COLLECTION = "document_child_chunks"
 SPARSE_VECTOR_NAME = "sparse"
 
-QDRANT_URL = os.environ.get("QDRANT_URL", "http://35.224.195.13:6333")
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY", "")
 
 # --- Model Configuration ---
