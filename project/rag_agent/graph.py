@@ -1,7 +1,8 @@
+import os
+from functools import partial
 from langgraph.graph import START, END, StateGraph
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import ToolNode
-from functools import partial
 
 from .graph_state import State
 from .nodes import *
@@ -11,7 +12,37 @@ def create_agent_graph(llm, tools_list):
     llm_with_tools = llm.bind_tools(tools_list)
     tool_node = ToolNode(tools_list)
 
+    # Inicialización dinámica de la memoria de LangGraph (Checkpointer)
+    DB_USER = os.environ.get("DB_USER")
+    DB_PASS = os.environ.get("DB_PASS")
+    DB_NAME = os.environ.get("DB_NAME")
+    INSTANCE_CONNECTION_NAME = os.environ.get("INSTANCE_CONNECTION_NAME")
+
     checkpointer = InMemorySaver()
+
+    if DB_USER and DB_PASS and DB_NAME:
+        try:
+            from psycopg_pool import ConnectionPool
+            from langgraph.checkpoint.postgres import PostgresSaver
+
+            # En Cloud Run, Google monta la base de datos como un Unix socket en /cloudsql/
+            if INSTANCE_CONNECTION_NAME:
+                conninfo = f"host=/cloudsql/{INSTANCE_CONNECTION_NAME} user={DB_USER} password={DB_PASS} dbname={DB_NAME}"
+            else:
+                db_host = os.environ.get("DB_HOST", "127.0.0.1")
+                conninfo = f"host={db_host} user={DB_USER} password={DB_PASS} dbname={DB_NAME}"
+
+            print("🔗 Conectando memoria persistente de LangGraph a PostgreSQL...")
+            # Pool de conexiones psycopg3 compatible con LangGraph
+            pool = ConnectionPool(conninfo=conninfo, max_size=5, min_size=1, kwargs={"autocommit": True})
+            
+            checkpointer = PostgresSaver(pool)
+            # Crea las tablas internas de LangGraph automáticamente si no existen
+            checkpointer.setup()
+            print("✅ Memoria persistente conectada de forma segura a PostgreSQL.")
+        except Exception as e:
+            print(f"⚠️ No se pudo inicializar PostgresSaver (usando InMemorySaver de fallback): {e}")
+            checkpointer = InMemorySaver()
 
     print("Compiling agent graph...")
     agent_builder = StateGraph(AgentState)
