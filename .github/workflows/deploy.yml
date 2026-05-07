@@ -44,6 +44,7 @@ jobs:
             --max-instances 5 \
             --concurrency 10 \
             --set-env-vars QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }} \
+            --set-env-vars QDRANT_URL=${{ secrets.QDRANT_URL }} \
             --set-env-vars PARENT_STORE_PATH=/app/data/parent_store \
             --set-env-vars MARKDOWN_DIR=/app/data/markdown_docs \
             --set-env-vars DB_USER=${{ secrets.DB_USER }} \
