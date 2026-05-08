@@ -4,6 +4,7 @@ import os
 _BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 MARKDOWN_DIR = os.environ.get("MARKDOWN_DIR", os.path.join(_BASE_DIR, "markdown_docs"))
+PDF_DIR = os.environ.get("PDF_DIR", os.path.join(_BASE_DIR, "pdf_docs"))
 PARENT_STORE_PATH = os.environ.get("PARENT_STORE_PATH", os.path.join(_BASE_DIR, "parent_store"))
 
 # --- GCP Config ---

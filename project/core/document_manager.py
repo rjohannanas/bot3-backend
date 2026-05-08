@@ -9,6 +9,8 @@ class DocumentManager:
         self.rag_system = rag_system
         self.markdown_dir = Path(config.MARKDOWN_DIR)
         self.markdown_dir.mkdir(parents=True, exist_ok=True)
+        self.pdf_dir = Path(config.PDF_DIR)
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
         
     def add_documents(self, document_paths, progress_callback=None):
         if not document_paths:
@@ -50,6 +52,9 @@ class DocumentManager:
                 if Path(doc_path).suffix.lower() == ".md":
                     shutil.copy(doc_path, md_path)
                 else:
+                    pdf_dest = self.pdf_dir / f"{doc_name}.pdf"
+                    if not pdf_dest.exists():
+                        shutil.copy(doc_path, pdf_dest)
                     pdfs_to_markdowns(str(doc_path), overwrite=False)            
                 parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(md_path)
                 
@@ -77,6 +82,8 @@ class DocumentManager:
     def clear_all(self):
         self.markdown_dir.mkdir(parents=True, exist_ok=True)
         clear_directory_contents(self.markdown_dir)
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        clear_directory_contents(self.pdf_dir)
         
         self.rag_system.parent_store.clear_store()
         self.rag_system.vector_db.delete_collection(self.rag_system.collection_name)
