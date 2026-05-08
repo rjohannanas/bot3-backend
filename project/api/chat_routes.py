@@ -138,3 +138,125 @@ async def chat_stream_endpoint(
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+# ─────────────────────────────────────────────
+#  Endpoints de Gestión de Sesiones (Historial)
+# ─────────────────────────────────────────────
+
+class SessionSummary(BaseModel):
+    """Resumen de una sesión para mostrar en la barra lateral del frontend."""
+    id: str
+    title: str
+    created_at: int   # Unix timestamp en milisegundos
+    updated_at: int   # Unix timestamp en milisegundos
+
+class MessageResponse(BaseModel):
+    """Un mensaje individual del historial de una sesión."""
+    id: str
+    role: str
+    content: str
+    timestamp: int    # Unix timestamp en milisegundos
+
+
+@router.get("/sessions", response_model=list[SessionSummary])
+async def list_sessions(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Devuelve todas las sesiones de chat del usuario autenticado,
+    ordenadas de la más reciente a la más antigua.
+    El título de cada sesión es el primer mensaje que envió el usuario.
+    """
+    user_id = user.get("uid", "anonymous")
+
+    sessions = await asyncio.to_thread(
+        lambda: db.query(ChatSession)
+                  .filter(ChatSession.user_id == user_id)
+                  .order_by(ChatSession.created_at.desc())
+                  .all()
+    )
+
+    result = []
+    for s in sessions:
+        # Obtener el primer mensaje del usuario para usar como título
+        first_msg = await asyncio.to_thread(
+            lambda sid=s.id: db.query(ChatMessage)
+                               .filter(ChatMessage.session_id == sid, ChatMessage.role == "user")
+                               .order_by(ChatMessage.created_at.asc())
+                               .first()
+        )
+        title = first_msg.content[:60] + ("..." if first_msg and len(first_msg.content) > 60 else "") \
+                if first_msg else "Nueva conversación"
+
+        result.append(SessionSummary(
+            id=s.id,
+            title=title,
+            created_at=int(s.created_at.timestamp() * 1000),
+            updated_at=int(s.created_at.timestamp() * 1000),
+        ))
+
+    return result
+
+
+@router.get("/sessions/{session_id}", response_model=list[MessageResponse])
+async def get_session_messages(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Devuelve todos los mensajes de una sesión específica.
+    Valida que la sesión pertenezca al usuario autenticado.
+    """
+    user_id = user.get("uid", "anonymous")
+
+    # Verificar propiedad de la sesión (seguridad: un usuario no puede ver chats de otro)
+    session = await asyncio.to_thread(
+        lambda: db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    if session.user_id != user_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver esta sesión")
+
+    messages = await asyncio.to_thread(
+        lambda: db.query(ChatMessage)
+                  .filter(ChatMessage.session_id == session_id)
+                  .order_by(ChatMessage.created_at.asc())
+                  .all()
+    )
+
+    return [
+        MessageResponse(
+            id=m.id,
+            role=m.role,
+            content=m.content,
+            timestamp=int(m.created_at.timestamp() * 1000),
+        )
+        for m in messages
+    ]
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Elimina una sesión y todos sus mensajes en cascada.
+    Valida que la sesión pertenezca al usuario autenticado.
+    """
+    user_id = user.get("uid", "anonymous")
+
+    session = await asyncio.to_thread(
+        lambda: db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    if session.user_id != user_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para eliminar esta sesión")
+
+    await asyncio.to_thread(lambda: (db.delete(session), db.commit()))
