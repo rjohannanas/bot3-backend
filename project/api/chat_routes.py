@@ -116,10 +116,6 @@ async def chat_stream_endpoint(
             if "metadata" in msg:
                 title = msg["metadata"].get("title", "Procesando...")
                 yield f"data: {json.dumps({'type': 'status', 'message': title})}\n\n"
-                
-                # Emitir Fuentes si vemos un resultado de herramienta
-                if "```" in content:
-                    yield f"data: {json.dumps({'type': 'sources', 'docs': [{'title': 'Base de Conocimiento RAG', 'url': '#'}]})}\n\n"
             
             # Emitir Tokens de texto
             else:
@@ -134,6 +130,25 @@ async def chat_stream_endpoint(
             ai_msg = ChatMessage(session_id=request.session_id, role="assistant", content=response_text)
             db.add(ai_msg)
             await asyncio.to_thread(db.commit)
+            
+            # Emitir Fuentes reales extrayéndolas de la respuesta final
+            import re
+            docs = []
+            if "**Fuentes:**" in response_text or "**Sources:**" in response_text:
+                parts = re.split(r'\*\*Fuentes:\*\*|\*\*Sources:\*\*', response_text)
+                if len(parts) > 1:
+                    sources_section = parts[-1]
+                    for line in sources_section.split('\n'):
+                        line = line.strip()
+                        if line.startswith('* ') or line.startswith('- '):
+                            fname = line[2:].strip()
+                            docs.append({
+                                "title": fname, 
+                                "url": f"https://storage.googleapis.com/recs-chb-seteloee/pdf_docs/{fname}"
+                            })
+            
+            if docs:
+                yield f"data: {json.dumps({'type': 'sources', 'docs': docs})}\n\n"
 
         yield "data: [DONE]\n\n"
 

@@ -47,6 +47,7 @@ jobs:
             --set-env-vars QDRANT_URL=${{ secrets.QDRANT_URL }} \
             --set-env-vars PARENT_STORE_PATH=/app/data/parent_store \
             --set-env-vars MARKDOWN_DIR=/app/data/markdown_docs \
+            --set-env-vars PDF_DIR=/app/data/pdf_docs \
             --set-env-vars DB_USER=${{ secrets.DB_USER }} \
             --set-env-vars DB_PASS=${{ secrets.DB_PASS }} \
             --set-env-vars DB_NAME=${{ secrets.DB_NAME }} \
