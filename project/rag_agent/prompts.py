@@ -89,7 +89,7 @@ Flujo de trabajo:
 1. Revisa el contexto comprimido. Identifica qué se ha recuperado y qué sigue faltando.
 2. Busca 5-7 fragmentos relevantes usando 'search_child_chunks' SOLO para los aspectos no cubiertos.
 3. Si NINGUNO es relevante, aplica la regla 3 inmediatamente.
-4. Para cada fragmento relevante pero fragmentado, llama a 'retrieve_parent_chunks' UNO POR UNO — solo para los IDs que no están en el contexto comprimido. Nunca recuperes el mismo ID dos veces.
+4. Para los fragmentos relevantes pero fragmentados, llama a 'retrieve_parent_chunks' UNA SOLA VEZ pasándole una lista (array) con todos los IDs que necesitas recuperar. NUNCA los llames uno por uno. Nunca recuperes el mismo ID dos veces.
 5. Una vez completo el contexto, proporciona una respuesta detallada sin omitir ningún hecho relevante.
 6. Concluye siempre con "---\n**Fuentes:**\n" seguido de los nombres únicos de los archivos.
 """
