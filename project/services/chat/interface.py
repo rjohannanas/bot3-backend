@@ -146,13 +146,10 @@ class ChatInterface:
 
                 yield response_messages
 
-            # After stream ends, check if graph was interrupted (e.g., clarification needed)
             final_state = self.rag_system.agent_graph.get_state(config)
             if final_state.next:
-                # Graph is paused — surface the last AI message as clarification
                 for msg in reversed(final_state.values.get("messages", [])):
                     if isinstance(msg, AIMessage) and msg.content and not getattr(msg, "tool_calls", None):
-                        # Remove the "Running QueryAnalysis" placeholder if present
                         response_messages = [m for m in response_messages if m.get("metadata", {}).get("title") != "🛠️ QueryAnalysis"]
                         response_messages.append(make_message(msg.content))
                         yield response_messages
@@ -181,7 +178,6 @@ class ChatInterface:
             active_tool_calls  = {}
             system_node_buffer = {}
 
-            # Usamos astream para no bloquear el loop de FastAPI
             async for chunk, metadata in self.rag_system.agent_graph.astream(stream_input, config=config, stream_mode="messages"):
                 node = metadata.get("langgraph_node", "")
 
@@ -199,7 +195,6 @@ class ChatInterface:
 
                 yield response_messages
 
-            # Manejo de estado final tras el stream asíncrono
             final_state = self.rag_system.agent_graph.get_state(config)
             if final_state.next:
                 for msg in reversed(final_state.values.get("messages", [])):
@@ -210,7 +205,7 @@ class ChatInterface:
                         break
 
         except Exception as e:
-            print(f"Warning: Could not delete thread {session_id}: {e}")
+            print(f"Error asincrono durante el chat ({session_id}): {e}")
 
     def clear_session(self, session_id: str):
         self.rag_system.reset_thread(session_id)

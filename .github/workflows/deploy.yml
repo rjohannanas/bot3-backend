@@ -48,6 +48,7 @@ jobs:
             --set-env-vars PARENT_STORE_PATH=/app/data/parent_store \
             --set-env-vars MARKDOWN_DIR=/app/data/markdown_docs \
             --set-env-vars PDF_DIR=/app/data/pdf_docs \
+            --set-env-vars ENABLE_GRADIO_UI=true \
             --set-env-vars DB_USER=${{ secrets.DB_USER }} \
             --set-env-vars DB_PASS=${{ secrets.DB_PASS }} \
             --set-env-vars DB_NAME=${{ secrets.DB_NAME }} \

@@ -1,23 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 import gradio as gr
 import os
-import json
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from ui.gradio_app import create_gradio_ui
-from core.dependencies import rag_system, chat_interface
-from api.chat_routes import router as chat_router
+from shared.agent.dependencies import rag_system
+from services.chat.routes import router as chat_router
+from services.ingestion.routes import router as ingestion_router
 from db.database import init_db
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicialización en caliente (Warm-up) del sistema RAG."""
+    """Inicialización controlada en el startup del servidor."""
+    # 1. Inicializar la base de datos
+    try:
+        init_db()
+        print("✅ [Startup] Base de datos inicializada")
+    except Exception as e:
+        print(f"⚠️ [Startup] Error inicializando la BD (continuando sin BD): {e}")
+
+    # 2. Inicializar el sistema RAG (warm-up)
     try:
         print("\n🚀 [Startup] Inicializando sistema RAG y compilando grafo...")
         rag_system.initialize()
@@ -33,10 +39,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configurar CORS (Fase 1)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción cambiar por la URL del frontend
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,21 +52,18 @@ def health_check():
     """Health check para Cloud Run startup/liveness probes."""
     return {"status": "ok"}
 
-# Inicializar la base de datos (crear tablas si no existen)
-try:
-    init_db()
-    print("✅ Base de datos inicializada")
-except Exception as e:
-    print(f"⚠️ Aviso: Error inicializando la BD (¿Falta IP/Credenciales?): {e}")
+# --- Registrar servicios ---
+app.include_router(chat_router)       # /api/chat, /api/chat/stream
+app.include_router(ingestion_router)  # /api/documents/upload
 
-# Registrar las rutas del chat (con Auth y DB)
-app.include_router(chat_router)  # /api/chat y /api/chat/stream
-
-
-# Montar la UI antigua de Gradio como sub-módulo
-print("\n🔨 Creando UI RAG (Gradio)...")
-demo = create_gradio_ui(rag_system)
-app = gr.mount_gradio_app(app, demo, path="/ui")
+# --- UI de Gradio (solo si está habilitada) ---
+if os.environ.get("ENABLE_GRADIO_UI", "false").lower() == "true":
+    print("\n🔨 [Dev] Creando UI RAG (Gradio)...")
+    demo = create_gradio_ui(rag_system)
+    app = gr.mount_gradio_app(app, demo, path="/ui")
+    print("✅ [Dev] Gradio disponible en /ui")
+else:
+    print("ℹ️ [Prod] Gradio UI desactivada (ENABLE_GRADIO_UI != true)")
 
 if __name__ == "__main__":
     import uvicorn

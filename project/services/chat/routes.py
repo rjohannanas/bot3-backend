@@ -4,13 +4,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import json
 import asyncio
+import re
 
 from db.database import get_db
 from db.models import ChatMessage, ChatSession
-from core.auth import get_current_user
-from core.dependencies import rag_system, chat_interface
+from shared.agent.auth import get_current_user
+from shared.agent.dependencies import rag_system, chat_interface
 
-# Instanciamos el router
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 def ensure_session(db: Session, session_id: str, user_id: str):
@@ -27,7 +27,7 @@ def ensure_session(db: Session, session_id: str, user_id: str):
 class ChatRequest(BaseModel):
     session_id: str = "default_session"
     message: str
-    history: list = [] # Opcional si permitimos que el cliente envíe su historia (aunque ya no es necesario con DB)
+    history: list = []
 
 class ChatResponse(BaseModel):
     response: str
@@ -42,13 +42,9 @@ async def chat_endpoint(
     Endpoint bloqueante autenticado.
     Recibe la petición, guarda en DB, espera al Agente y devuelve la respuesta.
     """
-    # La inicialización ahora ocurre en el startup de FastAPI (server.py)
-    
-    # 0. Asegurar que la sesión de chat existe
     user_id = user.get("uid", "anonymous")
     await asyncio.to_thread(ensure_session, db, request.session_id, user_id)
 
-    # 1. Guardar pregunta del usuario en base de datos
     user_msg = ChatMessage(session_id=request.session_id, role="user", content=request.message)
     db.add(user_msg)
     await asyncio.to_thread(db.commit)
@@ -59,7 +55,6 @@ async def chat_endpoint(
             final_msgs = chunk
         return final_msgs
 
-    # Ejecutar el chat sincrónico en un hilo separado
     final_messages = await asyncio.to_thread(run_chat)
         
     response_text = ""
@@ -68,7 +63,6 @@ async def chat_endpoint(
     else:
         response_text = str(final_messages)
         
-    # 2. Guardar respuesta del asistente en base de datos
     ai_msg = ChatMessage(session_id=request.session_id, role="assistant", content=response_text)
     db.add(ai_msg)
     await asyncio.to_thread(db.commit)
@@ -84,11 +78,9 @@ async def chat_stream_endpoint(
     """
     Endpoint de Streaming SSE autenticado (No bloqueante).
     """
-    # 0. Asegurar que la sesión de chat existe
     user_id = user.get("uid", "anonymous")
     await asyncio.to_thread(ensure_session, db, request.session_id, user_id)
 
-    # 1. Guardar pregunta del usuario
     user_msg = ChatMessage(session_id=request.session_id, role="user", content=request.message)
     db.add(user_msg)
     await asyncio.to_thread(db.commit)
@@ -98,7 +90,6 @@ async def chat_stream_endpoint(
         last_len = 0
         last_msg_idx = -1
         
-        # 2. Iterar generador ASÍNCRONO para no bloquear el loop
         async for chunk in chat_interface.achat(request.message, request.history, request.session_id):
             if not isinstance(chunk, list) or not chunk:
                 continue
@@ -107,17 +98,14 @@ async def chat_stream_endpoint(
             msg = chunk[-1]
             content = msg.get("content", "")
             
-            # Reiniciar cursor si pasamos a un nuevo mensaje en el array
             if idx != last_msg_idx:
                 last_len = 0
                 last_msg_idx = idx
                 
-            # Emitir Eventos de Estado
             if "metadata" in msg:
                 title = msg["metadata"].get("title", "Procesando...")
                 yield f"data: {json.dumps({'type': 'status', 'message': title})}\n\n"
             
-            # Emitir Tokens de texto
             else:
                 if len(content) > last_len:
                     delta = content[last_len:]
@@ -125,14 +113,11 @@ async def chat_stream_endpoint(
                     last_len = len(content)
                 response_text = content
 
-        # 3. Guardar respuesta final en BD una vez que terminó el streaming
         if response_text:
             ai_msg = ChatMessage(session_id=request.session_id, role="assistant", content=response_text)
             db.add(ai_msg)
             await asyncio.to_thread(db.commit)
             
-            # Emitir Fuentes reales extrayéndolas de la respuesta final
-            import re
             docs = []
             if "**Fuentes:**" in response_text or "**Sources:**" in response_text:
                 parts = re.split(r'\*\*Fuentes:\*\*|\*\*Sources:\*\*', response_text)

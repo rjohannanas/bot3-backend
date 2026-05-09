@@ -6,7 +6,7 @@ from db.parent_store_manager import ParentStoreManager
 from document_chunker import DocumentChunker
 from rag_agent.tools import ToolFactory
 from rag_agent.graph import create_agent_graph
-from core.observability import Observability
+from shared.agent.observability import Observability
 
 class RAGSystem:
 
