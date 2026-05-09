@@ -40,7 +40,8 @@ if INSTANCE_CONNECTION_NAME and DB_USER:
         pool_size=5,
         max_overflow=2,
         pool_timeout=30,
-        pool_recycle=1800 # Renovar conexiones cada 30 min para evitar desconexiones de Cloud SQL
+        pool_recycle=1800, # Renovar conexiones cada 30 min
+        pool_pre_ping=True # CRITICO: Verifica que la conexion este viva antes de usarla
     )
 else:
     # Fallback de emergencia por si faltan variables de entorno (guarda localmente)

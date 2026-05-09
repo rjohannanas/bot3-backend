@@ -34,6 +34,7 @@ gcloud run deploy $SERVICE_NAME \
   --set-env-vars QDRANT_API_KEY=$API_KEY \
   --set-env-vars PARENT_STORE_PATH=/app/data/parent_store \
   --set-env-vars MARKDOWN_DIR=/app/data/markdown_docs \
+  --set-env-vars ENABLE_GRADIO_UI=true \
   --set-env-vars DB_USER=${DB_USER} \
   --set-env-vars DB_PASS=${DB_PASS} \
   --set-env-vars DB_NAME=${DB_NAME} \

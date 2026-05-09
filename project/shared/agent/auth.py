@@ -9,13 +9,11 @@ security = HTTPBearer()
 def init_firebase():
     """Inicializa la app de Firebase Admin SDK de forma perezosa."""
     if not firebase_admin._apps:
-        # Usamos ApplicationDefaultCredentials de Google Cloud
         project_id = os.environ.get("FIREBASE_PROJECT_ID")
         if project_id:
             cred = credentials.ApplicationDefault()
             firebase_admin.initialize_app(cred, {'projectId': project_id})
         else:
-            # Fallback a inicialización estándar sin credenciales explícitas (funciona en GCP)
             firebase_admin.initialize_app()
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -27,7 +25,6 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     init_firebase()
     token = credentials.credentials
     try:
-        # Verifica el JWT usando las claves públicas de Firebase
         decoded_token = auth.verify_id_token(token)
         return decoded_token
     except Exception as e:

@@ -1,7 +1,7 @@
 import gradio as gr
-from core.chat_interface import ChatInterface
-from core.document_manager import DocumentManager
-from core.rag_system import RAGSystem
+from services.chat.interface import ChatInterface
+from services.ingestion.manager import DocumentManager
+from shared.agent.rag_system import RAGSystem
 import os
 
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "..", "assets")
