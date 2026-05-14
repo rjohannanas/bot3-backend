@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import json
 import asyncio
 import re
+import time
+import secrets
 
 from db.database import get_db
 from db.models import ChatMessage, ChatSession
 from shared.agent.auth import get_current_user
 from shared.agent.dependencies import rag_system, chat_interface
+from services.ingestion.routes import _download_tokens, DOWNLOAD_TOKEN_TTL_SECONDS
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
@@ -72,6 +75,7 @@ async def chat_endpoint(
 @router.post("/stream")
 async def chat_stream_endpoint(
     request: ChatRequest,
+    req: Request,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -127,11 +131,19 @@ async def chat_stream_endpoint(
                         line = line.strip()
                         if line.startswith('* ') or line.startswith('- '):
                             fname = line[2:].strip()
+                            # Generar token de un solo uso (30 min) directamente
+                            # aquí — el usuario ya está autenticado via Firebase.
+                            dl_token = secrets.token_urlsafe(32)
+                            _download_tokens[dl_token] = (
+                                fname,
+                                time.monotonic() + DOWNLOAD_TOKEN_TTL_SECONDS,
+                            )
+                            base_url = str(req.base_url).rstrip('/')
                             docs.append({
-                                "title": fname, 
-                                "url": f"https://storage.googleapis.com/recs-chb-seteloee/pdf_docs/{fname}"
+                                "title": fname,
+                                "url": f"{base_url}/api/documents/files/{fname}?token={dl_token}",
                             })
-            
+
             if docs:
                 yield f"data: {json.dumps({'type': 'sources', 'docs': docs})}\n\n"
 
