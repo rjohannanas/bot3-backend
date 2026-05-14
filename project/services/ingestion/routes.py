@@ -130,5 +130,14 @@ async def get_document(
         path=pdf_path,
         media_type="application/pdf",
         filename=filename,
-        headers={"Content-Disposition": f"inline; filename=\"{filename}\""}
+        headers={
+            # Muestra en visor del navegador (no fuerza descarga)
+            "Content-Disposition": f"inline; filename=\"{filename}\"",
+            # Permite que un iframe de otro origen (frontend) embeba este PDF
+            "Access-Control-Allow-Origin": "*",
+            # Elimina restricción de framing para permitir paneles laterales
+            "X-Frame-Options": "ALLOWALL",
+            # Política de seguridad de contenido que permite framing desde cualquier origen
+            "Content-Security-Policy": "frame-ancestors *",
+        }
     )
