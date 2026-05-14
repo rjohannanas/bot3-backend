@@ -12,7 +12,7 @@ from db.database import get_db
 from db.models import ChatMessage, ChatSession
 from shared.agent.auth import get_current_user
 from shared.agent.dependencies import rag_system, chat_interface
-from services.ingestion.routes import _download_tokens, DOWNLOAD_TOKEN_TTL_SECONDS
+from services.ingestion.tokens import _download_tokens, DOWNLOAD_TOKEN_TTL_SECONDS
 
 router = APIRouter(prefix="/api/chat", tags=["Chat"])
 

@@ -1,39 +1,43 @@
 import os
 import shutil
 import tempfile
+import secrets
+import time
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header, Query
+from fastapi.responses import FileResponse
+
+import config
+from shared.agent.auth import get_current_user
 from shared.agent.dependencies import rag_system
 from services.ingestion.manager import DocumentManager
+from services.ingestion.tokens import _download_tokens, DOWNLOAD_TOKEN_TTL_SECONDS, purge_expired_tokens
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
+# ─────────────────────────────────────────────────────────────────────────────
+# API Key para el scraper externo
+# ─────────────────────────────────────────────────────────────────────────────
 def verify_api_key(x_api_key: str = Header(None)):
     """Verifica que el scraper envíe la clave correcta en los headers."""
     expected_key = os.environ.get("ADMIN_API_KEY")
-    
     if not expected_key:
-        raise HTTPException(
-            status_code=500, 
-            detail="El servidor no tiene configurada la variable ADMIN_API_KEY"
-        )
-        
+        raise HTTPException(status_code=500, detail="ADMIN_API_KEY no configurada en el servidor.")
     if x_api_key != expected_key:
-        raise HTTPException(
-            status_code=401, 
-            detail="API Key inválida. Acceso denegado."
-        )
+        raise HTTPException(status_code=401, detail="API Key inválida. Acceso denegado.")
     return x_api_key
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Subida de documentos (scraper)
+# ─────────────────────────────────────────────────────────────────────────────
 @router.post("/upload")
 async def upload_documents(
     files: List[UploadFile] = File(...),
     api_key: str = Depends(verify_api_key)
 ):
     """
-    Endpoint para que el Scraper suba PDFs de forma automatizada.
     Guarda los archivos en Cloud Storage (vía FUSE), los vectoriza y actualiza Qdrant.
     """
     if not rag_system.agent_graph:
@@ -57,19 +61,12 @@ async def upload_documents(
         return {
             "status": "success",
             "message": "Archivos procesados correctamente",
-            "stats": {
-                "added": added,
-                "skipped": skipped,
-                "rejected": rejected
-            }
+            "stats": {"added": added, "skipped": skipped, "rejected": rejected}
         }
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error interno procesando documentos: {str(e)}")
-        
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Paso 1: El frontend autenticado solicita un token de descarga
@@ -79,23 +76,14 @@ async def request_download_token(
     filename: str,
     user: dict = Depends(get_current_user),
 ):
-    """
-    Genera un token de descarga de un solo uso (TTL: 30 min) para un archivo
-    específico. Solo usuarios autenticados con Firebase pueden obtenerlo.
-
-    Flujo:
-      1. Frontend llama a POST /api/documents/token?filename=X.pdf  (con Bearer)
-      2. Backend devuelve { "token": "...", "url": "..." }
-      3. Frontend abre la URL en nueva pestaña — el navegador no necesita enviar
-         el Bearer header, el token va en la query string.
-    """
+    """Genera un token de descarga de un solo uso (TTL: 30 min)."""
     base_dir = Path(config.PDF_DIR).resolve()
     pdf_path = (base_dir / filename).resolve()
 
     if not pdf_path.is_file() or not str(pdf_path).startswith(str(base_dir)):
         raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {filename}")
 
-    _purge_expired_tokens()
+    purge_expired_tokens()
 
     token = secrets.token_urlsafe(32)
     expires_at = time.monotonic() + DOWNLOAD_TOKEN_TTL_SECONDS
@@ -107,20 +95,16 @@ async def request_download_token(
         "expires_in_seconds": DOWNLOAD_TOKEN_TTL_SECONDS,
     }
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Paso 2: El navegador canjea el token y recibe el PDF
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/files/{filename}")
 async def get_document(
     filename: str,
-    token: str = Query(..., description="Token de descarga obtenido de POST /token"),
+    token: str = Query(..., description="Token de descarga"),
 ):
-    """
-    Sirve el PDF si el token es válido, pertenece a este archivo y no expiró.
-    El token se invalida inmediatamente tras el primer uso (one-time use).
-    """
-    _purge_expired_tokens()
+    """Sirve el PDF si el token es válido."""
+    purge_expired_tokens()
 
     entry = _download_tokens.get(token)
     if not entry:
@@ -132,24 +116,19 @@ async def get_document(
         raise HTTPException(status_code=401, detail="Token expirado.")
 
     if token_filename != filename:
-        raise HTTPException(status_code=403, detail="El token no corresponde a este archivo.")
+        raise HTTPException(status_code=403, detail="Token incorrecto para este archivo.")
 
-    # Invalidar el token tras el primer uso exitoso
-    _download_tokens.pop(token, None)
+    _download_tokens.pop(token, None) # One-time use
 
     base_dir = Path(config.PDF_DIR).resolve()
     pdf_path = (base_dir / filename).resolve()
 
     if not pdf_path.is_file() or not str(pdf_path).startswith(str(base_dir)):
-        raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {filename}")
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
 
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
         filename=filename,
-        headers={
-            # Abre en el visor del navegador (nueva pestaña), no descarga
-            "Content-Disposition": f"inline; filename=\"{filename}\"",
-        }
+        headers={"Content-Disposition": f"inline; filename=\"{filename}\""}
     )
-
