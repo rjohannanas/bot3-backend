@@ -2,7 +2,7 @@ import time
 
 # Almacén en memoria de tokens de descarga: {token -> (filename, expires_at)}
 _download_tokens: dict[str, tuple[str, float]] = {}
-DOWNLOAD_TOKEN_TTL_SECONDS = 1800  # 30 minutos
+DOWNLOAD_TOKEN_TTL_SECONDS = 604800  # 7 días de validez para evitar que expire rápido
 
 def purge_expired_tokens():
     """Limpia tokens expirados para evitar crecimiento ilimitado del dict."""

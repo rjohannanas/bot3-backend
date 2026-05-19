@@ -118,7 +118,7 @@ async def get_document(
     if token_filename != filename:
         raise HTTPException(status_code=403, detail="Token incorrecto para este archivo.")
 
-    _download_tokens.pop(token, None) # One-time use
+    # _download_tokens.pop(token, None) # Comentado: Ya no es de un solo uso
 
     base_dir = Path(config.PDF_DIR).resolve()
     pdf_path = (base_dir / filename).resolve()
