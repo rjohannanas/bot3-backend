@@ -66,8 +66,17 @@ class DocumentManager:
                         shutil.copy(doc_path, pdf_dest)
                     pdfs_to_markdowns(str(doc_path), overwrite=False)            
                 
-                source_url = metadata_urls.get(f"{doc_name}.md") or metadata_urls.get(f"{doc_name}.pdf")
-                parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(md_path, source_url)
+                # Soporte para metadata enriquecida (dict) o legacy (string)
+                file_meta = metadata_urls.get(f"{doc_name}.md") or metadata_urls.get(f"{doc_name}.pdf")
+                if isinstance(file_meta, dict):
+                    source_url = file_meta.pop("source_url", None)
+                    extra_metadata = file_meta  # entidad_id, tipo_dispositivo, etc.
+                else:
+                    source_url = file_meta
+                    extra_metadata = None
+                parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(
+                    md_path, source_url, extra_metadata=extra_metadata
+                )
                 
                 if not child_chunks:
                     skipped += 1
