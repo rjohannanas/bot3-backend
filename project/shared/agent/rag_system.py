@@ -10,8 +10,9 @@ from shared.agent.observability import Observability
 
 class RAGSystem:
 
-    def __init__(self, collection_name=config.CHILD_COLLECTION):
+    def __init__(self, collection_name=config.CHILD_COLLECTION, normas_collection_name=config.NORMAS_COLLECTION):
         self.collection_name = collection_name
+        self.normas_collection_name = normas_collection_name
         self.vector_db = VectorDbManager()
         self.parent_store = ParentStoreManager()
         self.chunker = DocumentChunker()
@@ -21,7 +22,9 @@ class RAGSystem:
 
     def initialize(self):
         self.vector_db.create_collection(self.collection_name)
+        self.vector_db.create_collection(self.normas_collection_name)
         collection = self.vector_db.get_collection(self.collection_name)
+        normas_collection = self.vector_db.get_collection(self.normas_collection_name)
 
         llm = ChatVertexAI(
             model=config.LLM_MODEL,
@@ -29,7 +32,7 @@ class RAGSystem:
             project=config.GCP_PROJECT,
             location=config.GCP_LLM_LOCATION
         )
-        tools = ToolFactory(collection).create_tools()
+        tools = ToolFactory(collection, normas_collection).create_tools()
         self.agent_graph = create_agent_graph(llm, tools)
 
     def get_config(self, session_id: str):

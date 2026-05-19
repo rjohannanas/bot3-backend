@@ -14,6 +14,8 @@ GCP_LLM_LOCATION = os.environ.get("GCP_LLM_LOCATION", "global")
 
 # --- Qdrant Configuration ---
 CHILD_COLLECTION = "document_child_chunks"
+NORMAS_COLLECTION = "normas_child_chunks"
+NORMAS_MARKDOWN_DIR = os.environ.get("NORMAS_MARKDOWN_DIR", os.path.join(_BASE_DIR, "normas_markdown_docs"))
 SPARSE_VECTOR_NAME = "sparse"
 
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")

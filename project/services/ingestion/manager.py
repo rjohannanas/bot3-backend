@@ -1,15 +1,18 @@
 from pathlib import Path
 import shutil
-import config
+import config as cfg
 from utils import pdfs_to_markdowns, clear_directory_contents
 
 class DocumentManager:
 
-    def __init__(self, rag_system):
+    def __init__(self, rag_system, source_collection=None):
         self.rag_system = rag_system
-        self.markdown_dir = Path(config.MARKDOWN_DIR)
+        # Si source_collection es normas → usar colección y directorio de normas
+        self.is_normas = (source_collection == cfg.NORMAS_COLLECTION)
+        self.markdown_dir = Path(cfg.NORMAS_MARKDOWN_DIR if self.is_normas else cfg.MARKDOWN_DIR)
+        self.collection_name = source_collection or rag_system.collection_name
         self.markdown_dir.mkdir(parents=True, exist_ok=True)
-        self.pdf_dir = Path(config.PDF_DIR)
+        self.pdf_dir = Path(cfg.PDF_DIR)
         self.pdf_dir.mkdir(parents=True, exist_ok=True)
         
     def add_documents(self, document_paths, metadata_urls=None, progress_callback=None):
@@ -82,7 +85,7 @@ class DocumentManager:
                     skipped += 1
                     continue
                 
-                collection = self.rag_system.vector_db.get_collection(self.rag_system.collection_name)
+                collection = self.rag_system.vector_db.get_collection(self.collection_name)
                 collection.add_documents(child_chunks)
                 self.rag_system.parent_store.save_many(parent_chunks)
                 

@@ -108,9 +108,12 @@ def ingest_batch(normas):
         response = requests.post(
             API_URL,
             files=files_payload,
-            data={"metadata_urls": json.dumps(metadata_dict)},
+            data={
+                "metadata_urls": json.dumps(metadata_dict),
+                "source_collection": "normas_child_chunks",
+            },
             headers={"x-api-key": API_KEY},
-            timeout=120,
+            timeout=600,
         )
 
         if response.status_code == 200:

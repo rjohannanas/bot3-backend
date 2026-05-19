@@ -4,12 +4,14 @@ from db.parent_store_manager import ParentStoreManager
 
 class ToolFactory:
     
-    def __init__(self, collection):
+    def __init__(self, collection, normas_collection=None):
         self.collection = collection
+        self.normas_collection = normas_collection
         self.parent_store_manager = ParentStoreManager()
     
     def _search_child_chunks(self, query: str, limit: int) -> str:
-        """Search for the top K most relevant child chunks.
+        """Search in manually uploaded documents (PDFs, technical manuals, reports).
+        Use this tool for general document queries not related to Peruvian legal norms.
         
         Args:
             query: Search query string
@@ -26,6 +28,36 @@ class ToolFactory:
                 f"Content: {doc.page_content.strip()}"
                 for doc in results
             ])            
+
+        except Exception as e:
+            return f"RETRIEVAL_ERROR: {str(e)}"
+
+    def _search_normas_chunks(self, query: str, limit: int) -> str:
+        """Search exclusively in legal norms from El Peruano (Decretos Supremos,
+        Resoluciones Ministeriales, Leyes, Ordenanzas, etc.).
+        Use this tool when the user asks about Peruvian legislation, regulations,
+        ministerial entities (MINEM, MINAM, MEF, etc.), or publication dates.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results to return
+        """
+        if not self.normas_collection:
+            return "NORMAS_COLLECTION_NOT_CONFIGURED"
+        try:
+            results = self.normas_collection.similarity_search(query, k=limit)
+            if not results:
+                return "NO_RELEVANT_NORMAS"
+
+            return "\n\n".join([
+                f"Parent ID: {doc.metadata.get('parent_id', '')}\n"
+                f"Fuente: {doc.metadata.get('source', '')}\n"
+                f"Entidad: {doc.metadata.get('entidad_nombre', 'N/A')}\n"
+                f"Tipo: {doc.metadata.get('tipo_dispositivo', 'N/A')}\n"
+                f"Fecha: {doc.metadata.get('fecha_publicacion', 'N/A')}\n"
+                f"Content: {doc.page_content.strip()}"
+                for doc in results
+            ])
 
         except Exception as e:
             return f"RETRIEVAL_ERROR: {str(e)}"
@@ -75,6 +107,7 @@ class ToolFactory:
     def create_tools(self) -> List:
         """Create and return the list of tools."""
         search_tool = tool("search_child_chunks")(self._search_child_chunks)
+        search_normas_tool = tool("search_normas_chunks")(self._search_normas_chunks)
         retrieve_tool = tool("retrieve_parent_chunks")(self._retrieve_many_parent_chunks)
         
-        return [search_tool, retrieve_tool]
+        return [search_tool, search_normas_tool, retrieve_tool]

@@ -36,6 +36,7 @@ def verify_api_key(x_api_key: str = Header(None)):
 async def upload_documents(
     files: List[UploadFile] = File(...),
     metadata_urls: str = Form(None),
+    source_collection: str = Form(default=None),
     api_key: str = Depends(verify_api_key)
 ):
     """
@@ -44,7 +45,7 @@ async def upload_documents(
     if not rag_system.agent_graph:
         rag_system.initialize()
 
-    doc_manager = DocumentManager(rag_system)
+    doc_manager = DocumentManager(rag_system, source_collection=source_collection)
     temp_dir = tempfile.mkdtemp()
     temp_paths = []
 
