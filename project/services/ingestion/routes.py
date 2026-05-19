@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Header, Query, Form
 from fastapi.responses import FileResponse
 
 import config
@@ -35,6 +35,7 @@ def verify_api_key(x_api_key: str = Header(None)):
 @router.post("/upload")
 async def upload_documents(
     files: List[UploadFile] = File(...),
+    metadata_urls: str = Form(None),
     api_key: str = Depends(verify_api_key)
 ):
     """
@@ -56,7 +57,7 @@ async def upload_documents(
                 shutil.copyfileobj(file.file, buffer)
             temp_paths.append(str(temp_path))
 
-        added, skipped, rejected = doc_manager.add_documents(temp_paths)
+        added, skipped, rejected = doc_manager.add_documents(temp_paths, metadata_urls)
 
         return {
             "status": "success",

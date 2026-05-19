@@ -12,9 +12,18 @@ class DocumentManager:
         self.pdf_dir = Path(config.PDF_DIR)
         self.pdf_dir.mkdir(parents=True, exist_ok=True)
         
-    def add_documents(self, document_paths, progress_callback=None):
+    def add_documents(self, document_paths, metadata_urls=None, progress_callback=None):
         if not document_paths:
             return 0, 0, []
+            
+        import json
+        if metadata_urls and isinstance(metadata_urls, str):
+            try:
+                metadata_urls = json.loads(metadata_urls)
+            except Exception:
+                metadata_urls = {}
+        elif not isinstance(metadata_urls, dict):
+            metadata_urls = {}
             
         document_paths = [document_paths] if isinstance(document_paths, str) else document_paths
         
@@ -56,7 +65,9 @@ class DocumentManager:
                     if not pdf_dest.exists():
                         shutil.copy(doc_path, pdf_dest)
                     pdfs_to_markdowns(str(doc_path), overwrite=False)            
-                parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(md_path)
+                
+                source_url = metadata_urls.get(f"{doc_name}.md") or metadata_urls.get(f"{doc_name}.pdf")
+                parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(md_path, source_url)
                 
                 if not child_chunks:
                     skipped += 1

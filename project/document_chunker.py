@@ -28,7 +28,7 @@ class DocumentChunker:
         
         return all_parent_chunks, all_child_chunks
 
-    def create_chunks_single(self, md_path):
+    def create_chunks_single(self, md_path, source_url=None):
         doc_path = Path(md_path)
         
         with open(doc_path, "r", encoding="utf-8") as f:
@@ -39,7 +39,7 @@ class DocumentChunker:
         cleaned_parents = self.__clean_small_chunks(split_parents)
         
         all_parent_chunks, all_child_chunks = [], []
-        self.__create_child_chunks(all_parent_chunks, all_child_chunks, cleaned_parents, doc_path)
+        self.__create_child_chunks(all_parent_chunks, all_child_chunks, cleaned_parents, doc_path, source_url)
         return all_parent_chunks, all_child_chunks
 
     def __merge_small_parents(self, chunks):
@@ -118,10 +118,11 @@ class DocumentChunker:
         
         return cleaned
 
-    def __create_child_chunks(self, all_parent_pairs, all_child_chunks, parent_chunks, doc_path):
+    def __create_child_chunks(self, all_parent_pairs, all_child_chunks, parent_chunks, doc_path, source_url=None):
         for i, p_chunk in enumerate(parent_chunks):
             parent_id = f"{doc_path.stem}_parent_{i}"
-            p_chunk.metadata.update({"source": f"{doc_path.stem}.pdf", "parent_id": parent_id})
+            source_val = source_url if source_url else f"{doc_path.stem}.pdf"
+            p_chunk.metadata.update({"source": source_val, "parent_id": parent_id})
             
             all_parent_pairs.append((parent_id, p_chunk))
             all_child_chunks.extend(self.__child_splitter.split_documents([p_chunk]))
